@@ -1,0 +1,348 @@
+blueprint:
+  name: ❄️ Opinionated Winter Credits Optimization
+  description: >-
+    Manage thermostats and other devices to optimize winter credits.
+
+
+    Uses [HydroQC](https://hydroqc.ca)'s sensors as default trigger timestamps.
+  domain: automation
+  author: RagingCub
+  input:
+    triggers_section:
+      name: Triggers settings
+      collapsed: true
+      input:
+        anchor_start:
+          description: Start time of anchor period (sensor.hydroqc_maison_next_anchor_start)
+          default: sensor.hydroqc_maison_next_anchor_start
+          selector:
+            entity:
+              integration: mqtt
+              device_class: timestamp
+              domain: sensor
+              multiple: false
+        anchor_end:
+          name: Anchor end
+          description: End time of anchor period (sensor.hydroqc_maison_next_anchor_end)
+          default: sensor.hydroqc_maison_next_anchor_end
+          selector:
+            entity:
+              integration: mqtt
+              device_class: timestamp
+              domain: sensor
+              multiple: false
+        peak_start:
+          name: Peak start
+          description: Start time of peak period (sensor.hydroqc_maison_next_peak_start)
+          default: sensor.hydroqc_maison_next_peak_start
+          selector:
+            entity:
+              integration: mqtt
+              device_class: timestamp
+              domain: sensor
+              multiple: false
+        peak_end:
+          name: Peak end
+          description: End time of peak period (sensor.hydroqc_maison_next_peak_end)
+          default: sensor.hydroqc_maison_next_peak_end
+          selector:
+            entity:
+              integration: mqtt
+              device_class: timestamp
+              domain: sensor
+              multiple: false
+        anchor_critical:
+          name: Anchor critical
+          description: Next anchor period will precede a critical peak (binary_sensor.hydroqc_maison_next_anchor_period_critical)
+          default: binary_sensor.hydroqc_maison_next_anchor_period_critical
+          selector:
+            entity:
+              integration: mqtt
+              domain: binary_sensor
+              multiple: false
+        peak_critical:
+          name: Peak critical
+          description: Next peak period will be critical (binary_sensor.hydroqc_maison_next_peak_period_critical)
+          default: binary_sensor.hydroqc_maison_next_peak_period_critical
+          selector:
+            entity:
+              integration: mqtt
+              domain: binary_sensor
+              multiple: false
+    temp_setpoints_primary:
+      name: Primary zone temperature setpoints
+      collapsed: true
+      input:
+        temp_high_primary:
+          name: Temperature high
+          description: Temperature setpoint to which the house will be pre-heated during a critical anchor period
+          default: 23
+          selector:
+            number:
+              min: 0
+              max: 50
+              unit_of_measurement: '°C'
+              mode: box
+        temp_norm_primary:
+          name: Temperature normal
+          description: Temperature setpoint at which to keep the house most of the time
+          default: 20
+          selector:
+            number:
+              min: 0
+              max: 50
+              unit_of_measurement: '°C'
+              mode: box
+        temp_low_primary:
+          name: Temperature low
+          description: Temperature setpoint to which the house will be tolerated during a critical peak period
+          default: 17
+          selector:
+            number:
+              min: 0
+              max: 50
+              unit_of_measurement: '°C'
+              mode: box
+    climate_entities_primary:
+      name: Primary Climate Entities
+      description: Climate entities of the primary zone to manage the temperature of during winter
+      selector:
+        target:
+          entity:
+            domain: climate
+    temp_setpoints_secondary:
+      name: Secondary zone temperature setpoints
+      collapsed: true
+      input:
+        temp_high_secondary:
+          name: Temperature high
+          description: Temperature setpoint to which the house will be pre-heated during a critical anchor period
+          default: 19
+          selector:
+            number:
+              min: 0
+              max: 50
+              unit_of_measurement: '°C'
+              mode: box
+        temp_norm_secondary:
+          name: Temperature normal
+          description: Temperature setpoint at which to keep the house most of the time
+          default: 16
+          selector:
+            number:
+              min: 0
+              max: 50
+              unit_of_measurement: '°C'
+              mode: box
+        temp_low_secondary:
+          name: Temperature low
+          description: Temperature setpoint to which the house will be tolerated during a critical peak period
+          default: 13
+          selector:
+            number:
+              min: 0
+              max: 50
+              unit_of_measurement: '°C'
+              mode: box
+    climate_entities_secondary:
+      name: Secondary Climate Entities
+      description: Climate entities of the secondary zone to manage the temperature of during winter
+      selector:
+        target:
+          entity:
+            domain: climate
+    heating_mode_section:
+      name: Heating mode configuration
+      description: >-
+        Use a `heating_mode` `Dropdown` helper to determine if the automation can use the secondary temperatures for the primary entities to reduce electricity consumption.
+
+
+        This helper has to be configured beforehand with the id `input_select.heating` and with the values: `away`, and `home`
+
+
+        [![Open your Home Assistant instance and show your helper entities.](https://my.home-assistant.io/badges/helpers.svg)](https://my.home-assistant.io/redirect/helpers/)
+      collapsed: true
+      input:
+        use_heating_mode:
+            name: Use heating mode
+            default: false
+            selector:
+              boolean:
+    switch_entities_optional:
+      name: Optional Switch Entities
+      description: Switch entities that the automation can take control of to optimise the winter credits
+      selector:
+        target:
+          entity:
+            domain: switch
+mode: parallel
+trigger:
+- trigger: time
+  at: !input anchor_start
+  id: anchor_start_trigger
+- trigger: time
+  at: !input anchor_end
+  id: anchor_end_trigger
+- trigger: time
+  at: !input peak_start
+  id: peak_start_trigger
+- trigger: time
+  at: !input peak_end
+  id: peak_end_trigger
+action:
+- variables:
+    use_heating_mode: !input use_heating_mode
+    temp_high_p: !input temp_high_primary
+    temp_norm_p: !input temp_norm_primary
+    temp_low_p: !input temp_low_primary
+    temp_high_s: !input temp_high_secondary
+    temp_norm_s: !input temp_norm_secondary
+    temp_low_s: !input temp_low_secondary
+    temp_high_primary: >
+      {% if use_heating_mode and is_state('input_select.heating', 'away') %}
+        {{ temp_high_s }}
+      {% else %}
+        {{ temp_high_p }}
+      {% endif %}
+    temp_norm_primary: >
+      {% if use_heating_mode and is_state('input_select.heating', 'away') %}
+        {{ temp_norm_s }}
+      {% else %}
+        {{ temp_norm_p }}
+      {% endif %}
+    temp_low_primary: >
+      {% if use_heating_mode and is_state('input_select.heating', 'away') %}
+        {{ temp_low_s }}
+      {% else %}
+        {{ temp_low_p }}
+      {% endif %}
+- choose:
+  - conditions:
+    - or:
+      - condition: trigger
+        id: anchor_start_trigger
+      - condition: time
+        after: !input anchor_start
+        before: !input anchor_end
+    sequence:
+    - choose:
+      - conditions:
+        - condition: state
+          entity_id: !input anchor_critical
+          state: 'on'
+        sequence:
+        - action: climate.set_temperature
+          target: !input climate_entities_primary
+          data:
+            temperature: '{{ temp_high_primary }}'
+        - action: climate.set_temperature
+          target: !input climate_entities_secondary
+          data:
+            temperature: !input temp_high_secondary
+      - conditions:
+        - condition: state
+          entity_id: !input anchor_critical
+          state: 'off'
+        sequence:
+        - action: climate.set_temperature
+          target: !input climate_entities_primary
+          data:
+            temperature: '{{ temp_low_primary }}'
+        - action: climate.set_temperature
+          target: !input climate_entities_secondary
+          data:
+            temperature: !input temp_low_secondary
+  - conditions:
+    - or:
+      - condition: trigger
+        id: anchor_end_trigger
+      - condition: time
+        after: !input anchor_end
+        before: !input peak_start
+    sequence:
+    - choose:
+      - conditions:
+        - condition: state
+          entity_id: !input anchor_critical
+          state: 'on'
+        sequence: []
+      - conditions:
+        - condition: state
+          entity_id: !input anchor_critical
+          state: 'off'
+        sequence:
+        - action: climate.set_temperature
+          target: !input climate_entities_primary
+          data:
+            temperature: '{{ temp_norm_primary }}'
+        - action: climate.set_temperature
+          target: !input climate_entities_secondary
+          data:
+            temperature: !input temp_norm_secondary
+  - conditions:
+    - or:
+      - condition: trigger
+        id: peak_start_trigger
+      - condition: time
+        after: !input peak_start
+        before: !input peak_end
+    sequence:
+    - choose:
+      - conditions:
+        - condition: state
+          entity_id: !input peak_critical
+          state: 'on'
+        sequence:
+        - action: climate.set_temperature
+          target: !input climate_entities_primary
+          data:
+            temperature: '{{ temp_low_primary }}'
+        - action: climate.set_temperature
+          target: !input climate_entities_secondary
+          data:
+            temperature: !input temp_low_secondary
+        - action: switch.turn_off
+          target: !input switch_entities_optional
+      - conditions:
+        - condition: state
+          entity_id: !input peak_critical
+          state: 'off'
+        sequence: []
+  - conditions:
+    - or:
+      - condition: trigger
+        id: peak_end_trigger
+      - condition: time
+        before: !input anchor_start
+    sequence:
+    - choose:
+      - conditions:
+        - condition: state
+          entity_id: !input anchor_critical
+          state: 'on'
+        sequence:
+        - action: climate.set_temperature
+          target: !input climate_entities_primary
+          data:
+            temperature: '{{ temp_norm_primary }}'
+        - action: climate.set_temperature
+          target: !input climate_entities_secondary
+          data:
+            temperature: !input temp_norm_secondary
+        - action: switch.turn_off # Move consumption of these devices to the next *critical* anchor period
+          target: !input switch_entities_optional
+      - conditions:
+        - condition: state
+          entity_id: !input anchor_critical
+          state: 'off'
+        sequence:
+        - action: climate.set_temperature
+          target: !input climate_entities_primary
+          data:
+            temperature: '{{ temp_norm_primary }}'
+        - action: climate.set_temperature
+          target: !input climate_entities_secondary
+          data:
+            temperature: !input temp_norm_secondary
+        - action: switch.turn_on
+          target: !input switch_entities_optional
