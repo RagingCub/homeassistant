@@ -1,0 +1,43 @@
+blueprint:
+  name: 🌡️ Zwave Thermostat External Temperature Display
+  description: >-
+    Update z-wave thermostat displays with exterior temperature (shown as `°EXT` on my particular brand of thermostat).
+
+
+    Written for use with Stelpro's `STZW402+` thermostat model.
+  domain: automation
+  author: RagingCub
+  input:
+    thermostats:
+      name: Thermostats
+      description: Thermostats entities to update
+      selector:
+        entity:
+          integration: zwave_js
+          domain: climate
+          multiple: true
+    weather:
+      name: Weather forecast
+      description: Weather entity providing the temperature value
+      selector:
+        entity:
+          domain: weather
+          multiple: false
+mode: single
+trigger:
+- trigger: state
+  entity_id: !input weather
+  attribute: temperature
+actions:
+- variables:
+    weather: !input weather # required to pass the value to templates
+- action: zwave_js.invoke_cc_api
+  data:
+    entity_id: !input thermostats
+    command_class: 0x31
+    endpoint: 0
+    method_name: sendReport
+    parameters:
+    - 1
+    - 0
+    - "{{ state_attr(weather, 'temperature') | round(2, default=99) }}"
