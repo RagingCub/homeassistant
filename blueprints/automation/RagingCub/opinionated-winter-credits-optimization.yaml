@@ -239,6 +239,8 @@ action:
           target: !input climate_entities_secondary
           data:
             temperature: !input temp_high_secondary
+        - action: switch.turn_on
+          target: !input switch_entities_optional
       - conditions:
         - condition: state
           entity_id: !input anchor_critical
