@@ -106,6 +106,8 @@ blueprint:
     climate_entities_primary:
       name: Primary Climate Entities
       description: Climate entities of the primary zone to manage the temperature of during winter
+      default:
+        entity_id: []
       selector:
         target:
           entity:
@@ -147,6 +149,8 @@ blueprint:
     climate_entities_secondary:
       name: Secondary Climate Entities
       description: Climate entities of the secondary zone to manage the temperature of during winter
+      default:
+        entity_id: []
       selector:
         target:
           entity:
@@ -171,6 +175,8 @@ blueprint:
     switch_entities_optional:
       name: Optional Switch Entities
       description: Switch entities that the automation can take control of to optimise the winter credits
+      default:
+        entity_id: []
       selector:
         target:
           entity:
